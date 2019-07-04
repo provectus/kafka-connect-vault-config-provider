@@ -9,6 +9,8 @@ import com.bettercloud.vault.Vault;
 import com.bettercloud.vault.VaultConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpHeaders;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.UnsupportedEncodingException;
@@ -17,6 +19,8 @@ import java.net.URISyntaxException;
 import java.util.*;
 
 public class AwsIamAuth {
+
+    private final static Logger LOGGER = LoggerFactory.getLogger(AwsIamAuth.class);
 
     private static final String DEFAULT_AWS_AUTHENTICATION_PATH = "aws";
     private static final String DEFAULT_AWS_REQUEST_BODY = "Action=GetCallerIdentity&Version=2011-06-15";
@@ -63,10 +67,11 @@ public class AwsIamAuth {
             byte[] signedBytes = objectMapper.writeValueAsBytes(signedHeaders);
 
             VaultConfig vaultConfig = new VaultConfig()
-                    .address(vaultAddress);
+                    .address(vaultAddress)
+                    .build();
 
             Vault vault = new Vault(vaultConfig);
-            
+
             return vault.auth().loginByAwsIam(
                     role,
                     Base64.getEncoder().encodeToString(DEFAULT_AWS_STS_ENDPOINT.getBytes("UTF-8")),

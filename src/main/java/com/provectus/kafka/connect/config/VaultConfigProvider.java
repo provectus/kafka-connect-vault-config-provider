@@ -3,10 +3,13 @@ package com.provectus.kafka.connect.config;
 import com.bettercloud.vault.Vault;
 import com.bettercloud.vault.VaultConfig;
 import com.bettercloud.vault.VaultException;
+import com.bettercloud.vault.response.LookupResponse;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigData;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.provider.ConfigProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -16,6 +19,8 @@ import java.util.Set;
 
 public class VaultConfigProvider implements ConfigProvider {
 
+    private final static Logger LOGGER = LoggerFactory.getLogger(VaultConfigProvider.class);
+
     public interface ConfigName {
         String URI_FIELD = "uri";
         String TOKEN_FIELD = "token";
@@ -24,9 +29,13 @@ public class VaultConfigProvider implements ConfigProvider {
         String MAX_RETRIES_FIELD = "maxretries";
         String AWS_VAULT_SERVER_ID = "awsserverid";
         String AWS_IAM_ROLE = "awsiamrole";
+        String TOKEN_MIN_TTL = "tokenminttl";
     }
 
     private Vault vault;
+    private int minTTL = 3600;
+    private long expired = -1;
+    private AbstractConfig config;
 
     public static final ConfigDef CONFIG_DEF = new ConfigDef()
             .define(ConfigName.URI_FIELD, ConfigDef.Type.STRING, null, ConfigDef.Importance.HIGH,
@@ -42,7 +51,10 @@ public class VaultConfigProvider implements ConfigProvider {
             .define(ConfigName.AWS_IAM_ROLE, ConfigDef.Type.STRING, null, ConfigDef.Importance.HIGH,
                     "Field config for aws iam role")
             .define(ConfigName.AWS_VAULT_SERVER_ID, ConfigDef.Type.STRING, null, ConfigDef.Importance.HIGH,
-                    "Field config for aws vault server id");
+                    "Field config for aws vault server id")
+            .define(ConfigName.TOKEN_MIN_TTL, ConfigDef.Type.INT, 3600, ConfigDef.Importance.HIGH,
+                    "Field config for vault min ttl before renew");
+
 
 
     /**
@@ -60,10 +72,25 @@ public class VaultConfigProvider implements ConfigProvider {
         }
     }
 
+    private void validateToken() {
+        try {
+            LookupResponse lookupResponse = vault.auth().lookupSelf();
+            this.expired = lookupResponse.getCreationTime() + lookupResponse.getTTL();
+            LOGGER.info("Vault token ttl: {} ", lookupResponse.getTTL());
+            if (lookupResponse.getTTL() < this.minTTL) {
+                vault.auth().renewSelf();
+            }
+        } catch (Exception e) {
+            this.vault = this.buildVault(this.config);
+            LOGGER.error("Can't renew token ", e);
+        }
+    }
+
     private boolean checkGet(String path) {
         if (vault == null) {
             throw new RuntimeException("Vault is not configured");
         }
+        validateToken();
         if (path == null || path.isEmpty()) {
             return true;
         }
@@ -99,14 +126,21 @@ public class VaultConfigProvider implements ConfigProvider {
     }
 
     public void configure(Map<String, ?> props) {
-        final AbstractConfig config = new AbstractConfig(CONFIG_DEF, props);
+        this.config = new AbstractConfig(CONFIG_DEF, props);
 
+        this.minTTL = config.getInt(ConfigName.TOKEN_MIN_TTL);
+        this.vault = buildVault(config);
+    }
+
+    private Vault buildVault(AbstractConfig config) {
 
         try {
+
             String token = config.getString(ConfigName.TOKEN_FIELD);
             if (token.equals("AWS_IAM")) {
                 token = requestAWSIamToken(config);
             }
+
             final VaultConfig vaultConfig = new VaultConfig()
                     .address(config.getString(ConfigName.URI_FIELD))
                     .token(token)
@@ -114,12 +148,12 @@ public class VaultConfigProvider implements ConfigProvider {
                     .readTimeout(config.getInt(ConfigName.READ_TIMEOUT_FIELD))
                     .build();
 
-            this.vault = new Vault(vaultConfig);
+            this.validateToken();
 
+            return new Vault(vaultConfig);
         } catch (VaultException e) {
             throw new RuntimeException(e);
         }
-
     }
 
     private String requestAWSIamToken(AbstractConfig config) {
