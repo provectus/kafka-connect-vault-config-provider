@@ -130,6 +130,7 @@ public class VaultConfigProvider implements ConfigProvider {
 
         this.minTTL = config.getInt(ConfigName.TOKEN_MIN_TTL);
         this.vault = buildVault(config);
+        this.validateToken();
     }
 
     private Vault buildVault(AbstractConfig config) {
@@ -147,8 +148,6 @@ public class VaultConfigProvider implements ConfigProvider {
                     .openTimeout(config.getInt(ConfigName.OPEN_TIMEOUT_FIELD))
                     .readTimeout(config.getInt(ConfigName.READ_TIMEOUT_FIELD))
                     .build();
-
-            this.validateToken();
 
             return new Vault(vaultConfig);
         } catch (VaultException e) {
