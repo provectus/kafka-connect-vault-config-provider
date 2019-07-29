@@ -71,8 +71,10 @@ workflows:
   version: 2
   build-and-release:
     jobs:
-      - build
+      - build:
+          context: Public
       - release:
+          context: Public
           requires:
             - build
           filters:
