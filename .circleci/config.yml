@@ -1,0 +1,80 @@
+version: 2
+
+defaults: &defaults
+  docker:
+    - image: maven:3-jdk-12
+      entrypoint: /bin/sh
+  working_directory: ~/repo
+  environment:
+    MAVEN_OPTS: -Xmx3200m
+
+jobs:
+  build:
+    <<: *defaults
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "pom.xml" }}
+            - v1-dependencies-
+      - run: mvn -s .circleci/settings.xml clean install
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "pom.xml" }}
+      - persist_to_workspace:
+          root: .
+          paths: .
+
+  release:
+    <<: *defaults
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "pom.xml" }}
+            - v1-dependencies-
+      - run:
+          name: Release
+          command: |
+            yum install -y git
+            OLD_VERSION=$(mvn -s .circleci/settings.xml -q \
+              -Dexec.executable="echo" -Dexec.args='${project.version}' \
+              --non-recursive org.codehaus.mojo:exec-maven-plugin:1.3.1:exec)
+            NEW_VERSION="${OLD_VERSION/-SNAPSHOT/}"
+            echo "Releasing $OLD_VERSION as $NEW_VERSION"
+            mvn -q -s .circleci/settings.xml versions:use-releases
+            mvn -q -s .circleci/settings.xml versions:set -DnewVersion="$NEW_VERSION"
+            mvn -q -s .circleci/settings.xml deploy -DaltDeploymentRepository=release::default::${CI_ARTIFACTORY_URL}/libs-release
+            git config user.name "${GITHUB_BOT_NAME}"
+            git config user.email "${GITHUB_BOT_EMAIL}"
+            git remote rm origin
+            git remote add origin https://${GITHUB_BOT_NAME}:${GITHUB_BOT_TOKEN}@github.com/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}.git
+            git fetch --all
+            git add pom.xml
+            git commit -m "release: $NEW_VERSION [skip ci]"
+            git tag "$NEW_VERSION"
+            git checkout master
+            git merge --no-edit origin/release
+            git push origin master --tags
+            MAJ_VERSION=$(echo "$NEW_VERSION" | cut -d '.' -f 1)
+            MIN_VERSION=$(echo "$NEW_VERSION" | cut -d '.' -f 2)
+            NEW_MINOR=$(($MIN_VERSION + 1))
+            DEV_VERSION="$MAJ_VERSION.$NEW_MINOR-SNAPSHOT"
+            git merge --no-edit origin/release
+            mvn -q -s .circleci/settings.xml versions:set -DnewVersion="$DEV_VERSION"
+            git add pom.xml
+            git commit -m "for development: $DEV_VERSION [skip ci]"
+            git push origin master
+
+workflows:
+  version: 2
+  build-and-release:
+    jobs:
+      - build
+      - release:
+          requires:
+            - build
+          filters:
+            branches:
+              only: /^release$/
