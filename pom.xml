@@ -7,7 +7,7 @@
     <groupId>com.provectus</groupId>
     <artifactId>kafka-connect-vault-config-provider</artifactId>
     <name>kafka-connect-vault-config-provider</name>
-    <version>0.1</version>
+    <version>0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -24,7 +24,7 @@
     <distributionManagement>
         <repository>
             <id>provectus</id>
-            <url>http://ec2-35-157-13-60.eu-central-1.compute.amazonaws.com/artifactory/libs-release</url>
+            <url>https://artifactory.provectus.com/artifactory/libs-release</url>
         </repository>
     </distributionManagement>
 
