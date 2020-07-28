@@ -12,14 +12,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class VaultConfigProvider implements ConfigProvider {
 
     private final static Logger LOGGER = LoggerFactory.getLogger(VaultConfigProvider.class);
+
+    private final AtomicReference<TokenMetadata> tokenMetadata = new AtomicReference<>(new TokenMetadata(LocalDateTime.now(), null));
 
     public interface ConfigName {
         String URI_FIELD = "uri";
@@ -30,10 +34,12 @@ public class VaultConfigProvider implements ConfigProvider {
         String AWS_VAULT_SERVER_ID = "awsserverid";
         String AWS_IAM_ROLE = "awsiamrole";
         String TOKEN_MIN_TTL = "tokenminttl";
+        String TOKEN_HARD_RENEW_THRESHOLD = "tokenrenewthreshold";
     }
 
     private Vault vault;
     private int minTTL = 3600;
+    private int hardRenewThreshold = 7200;
     private long expired = -1;
     private AbstractConfig config;
 
@@ -53,7 +59,9 @@ public class VaultConfigProvider implements ConfigProvider {
             .define(ConfigName.AWS_VAULT_SERVER_ID, ConfigDef.Type.STRING, null, ConfigDef.Importance.HIGH,
                     "Field config for aws vault server id")
             .define(ConfigName.TOKEN_MIN_TTL, ConfigDef.Type.INT, 3600, ConfigDef.Importance.HIGH,
-                    "Field config for vault min ttl before renew");
+                    "Field config for vault min ttl before renew")
+            .define(ConfigName.TOKEN_HARD_RENEW_THRESHOLD, ConfigDef.Type.INT, 7200, ConfigDef.Importance.HIGH,
+                    "Field config for vault token hard renew threshold in minutes");
 
 
 
@@ -74,16 +82,34 @@ public class VaultConfigProvider implements ConfigProvider {
 
     private void validateToken() {
         try {
-            LookupResponse lookupResponse = vault.auth().lookupSelf();
-            this.expired = lookupResponse.getCreationTime() + lookupResponse.getTTL();
-            LOGGER.info("Vault token ttl: {} ", lookupResponse.getTTL());
-            if (lookupResponse.getTTL() < this.minTTL) {
-                vault.auth().renewSelf();
+            if (isNeedHardRenew()) {
+                buildVault();
+            } else {
+                renewToken();
             }
         } catch (Exception e) {
-            this.vault = this.buildVault(this.config);
+            // as a fallback
+            buildVault();
             LOGGER.error("Can't renew token ", e);
         }
+    }
+
+    private void buildVault() {
+        LOGGER.info("Token is invalid. Generate a new one.");
+        this.vault = this.buildVault(this.config);
+    }
+
+    private void renewToken() throws VaultException {
+        LookupResponse lookupResponse = vault.auth().lookupSelf();
+        this.expired = lookupResponse.getCreationTime() + lookupResponse.getTTL();
+        LOGGER.info("Vault token ttl: {} ", lookupResponse.getTTL());
+        if (lookupResponse.getTTL() < this.minTTL) {
+            vault.auth().renewSelf();
+        }
+    }
+
+    private boolean isNeedHardRenew() {
+        return this.tokenMetadata.get().getCreatedDate().plusMinutes(this.hardRenewThreshold).isBefore(LocalDateTime.now());
     }
 
     private boolean checkGet(String path) {
@@ -129,6 +155,7 @@ public class VaultConfigProvider implements ConfigProvider {
         this.config = new AbstractConfig(CONFIG_DEF, props);
 
         this.minTTL = config.getInt(ConfigName.TOKEN_MIN_TTL);
+        this.hardRenewThreshold = config.getInt(ConfigName.TOKEN_HARD_RENEW_THRESHOLD);
         this.vault = buildVault(config);
         this.validateToken();
     }
@@ -140,6 +167,7 @@ public class VaultConfigProvider implements ConfigProvider {
             String token = config.getString(ConfigName.TOKEN_FIELD);
             if (token.equals("AWS_IAM")) {
                 token = requestAWSIamToken(config);
+                tokenMetadata.set(new TokenMetadata(LocalDateTime.now(), token));
             }
 
             final VaultConfig vaultConfig = new VaultConfig()
@@ -160,6 +188,25 @@ public class VaultConfigProvider implements ConfigProvider {
             config.getString(ConfigName.AWS_VAULT_SERVER_ID),
                 config.getString(ConfigName.URI_FIELD)
         ).getToken(config.getString(ConfigName.AWS_IAM_ROLE));
+    }
+
+    private static class TokenMetadata {
+
+        private final LocalDateTime createdDate;
+        private final String token;
+
+        public TokenMetadata(LocalDateTime createdDate, String token) {
+            this.createdDate = createdDate;
+            this.token = token;
+        }
+
+        public LocalDateTime getCreatedDate() {
+            return createdDate;
+        }
+
+        public String getToken() {
+            return token;
+        }
     }
 
 
