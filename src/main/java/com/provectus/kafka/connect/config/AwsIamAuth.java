@@ -17,6 +17,7 @@ import java.io.ByteArrayInputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class AwsIamAuth {
@@ -45,7 +46,7 @@ public class AwsIamAuth {
         headers.put(HttpHeaders.CONTENT_TYPE, "application/x-www-form-urlencoded; charset=utf-8");
 
         DefaultRequest<String> defaultRequest = new DefaultRequest<>("sts");
-        defaultRequest.setContent(new ByteArrayInputStream(DEFAULT_AWS_REQUEST_BODY.getBytes("UTF-8")));
+        defaultRequest.setContent(new ByteArrayInputStream(DEFAULT_AWS_REQUEST_BODY.getBytes(StandardCharsets.UTF_8)));
         defaultRequest.setHeaders(headers);
         defaultRequest.setHttpMethod(HttpMethodName.POST);
         defaultRequest.setEndpoint(new URI(DEFAULT_AWS_STS_ENDPOINT));
@@ -75,8 +76,8 @@ public class AwsIamAuth {
 
             AuthResponse authResponse = vault.auth().loginByAwsIam(
                     role,
-                    Base64.getEncoder().encodeToString(DEFAULT_AWS_STS_ENDPOINT.getBytes("UTF-8")),
-                    Base64.getEncoder().encodeToString(DEFAULT_AWS_REQUEST_BODY.getBytes("UTF-8")),
+                    Base64.getEncoder().encodeToString(DEFAULT_AWS_STS_ENDPOINT.getBytes(StandardCharsets.UTF_8)),
+                    Base64.getEncoder().encodeToString(DEFAULT_AWS_REQUEST_BODY.getBytes(StandardCharsets.UTF_8)),
                     Base64.getEncoder().encodeToString(signedBytes),
                     DEFAULT_AWS_AUTHENTICATION_PATH
             );
