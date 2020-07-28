@@ -7,6 +7,7 @@ import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.http.HttpMethodName;
 import com.bettercloud.vault.Vault;
 import com.bettercloud.vault.VaultConfig;
+import com.bettercloud.vault.response.AuthResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpHeaders;
 import org.slf4j.Logger;
@@ -22,7 +23,7 @@ public class AwsIamAuth {
 
     private final static Logger LOGGER = LoggerFactory.getLogger(AwsIamAuth.class);
 
-    private static final String DEFAULT_AWS_AUTHENTICATION_PATH = "aws";
+    public static final String DEFAULT_AWS_AUTHENTICATION_PATH = "aws";
     private static final String DEFAULT_AWS_REQUEST_BODY = "Action=GetCallerIdentity&Version=2011-06-15";
     private static final String DEFAULT_AWS_STS_ENDPOINT = "https://sts.amazonaws.com";
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -72,13 +73,15 @@ public class AwsIamAuth {
 
             Vault vault = new Vault(vaultConfig);
 
-            return vault.auth().loginByAwsIam(
+            AuthResponse authResponse = vault.auth().loginByAwsIam(
                     role,
                     Base64.getEncoder().encodeToString(DEFAULT_AWS_STS_ENDPOINT.getBytes("UTF-8")),
                     Base64.getEncoder().encodeToString(DEFAULT_AWS_REQUEST_BODY.getBytes("UTF-8")),
                     Base64.getEncoder().encodeToString(signedBytes),
                     DEFAULT_AWS_AUTHENTICATION_PATH
-            ).getAuthClientToken();
+            );
+            LOGGER.info("Authenticated. AuthRenewable = {}, Renewable = {}", authResponse.isAuthRenewable(), authResponse.getRenewable());
+            return authResponse.getAuthClientToken();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

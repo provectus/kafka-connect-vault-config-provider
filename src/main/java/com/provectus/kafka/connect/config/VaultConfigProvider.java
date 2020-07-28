@@ -17,6 +17,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static com.provectus.kafka.connect.config.AwsIamAuth.DEFAULT_AWS_AUTHENTICATION_PATH;
+
 public class VaultConfigProvider implements ConfigProvider {
 
     private final static Logger LOGGER = LoggerFactory.getLogger(VaultConfigProvider.class);
@@ -74,11 +76,14 @@ public class VaultConfigProvider implements ConfigProvider {
 
     private void validateToken() {
         try {
-            LookupResponse lookupResponse = vault.auth().lookupSelf();
+            LookupResponse lookupResponse = vault.auth().lookupSelf(DEFAULT_AWS_AUTHENTICATION_PATH);
             this.expired = lookupResponse.getCreationTime() + lookupResponse.getTTL();
             LOGGER.info("Vault token ttl: {} ", lookupResponse.getTTL());
+            if (!lookupResponse.isRenewable()) {
+                LOGGER.info("Token is not renewable!!!");
+            }
             if (lookupResponse.getTTL() < this.minTTL) {
-                vault.auth().renewSelf();
+                vault.auth().renewSelf(-1, DEFAULT_AWS_AUTHENTICATION_PATH);
             }
         } catch (Exception e) {
             this.vault = this.buildVault(this.config);
