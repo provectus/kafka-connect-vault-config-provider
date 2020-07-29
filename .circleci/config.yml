@@ -45,7 +45,7 @@ jobs:
             echo "Releasing $OLD_VERSION as $NEW_VERSION"
             mvn -q -s .circleci/settings.xml versions:use-releases
             mvn -q -s .circleci/settings.xml versions:set -DnewVersion="$NEW_VERSION"
-            mvn -q -s .circleci/settings.xml deploy -DaltDeploymentRepository=release::default::${CI_ARTIFACTORY_URL}/libs-release
+            mvn -q -s .circleci/settings.xml deploy -P assembly -DaltDeploymentRepository=release::default::${CI_ARTIFACTORY_URL}/libs-release
             git config user.name "${GITHUB_BOT_NAME}"
             git config user.email "${GITHUB_BOT_EMAIL}"
             git remote rm origin
