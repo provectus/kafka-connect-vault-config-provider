@@ -183,8 +183,8 @@ public class VaultConfigProvider implements ConfigProvider {
 
     private LocalDateTime getTokenExpirationTime() throws VaultException {
         LookupResponse lookupResponse = this.vault.auth().lookupSelf();
-        long initialTtlInSec = lookupResponse.getCreationTTL() != 0L ? lookupResponse.getCreationTTL() : lookupResponse.getTTL();
-        return LocalDateTime.now().plusSeconds(initialTtlInSec - tokenInitializationTime);
+        long creationTtlInSec = lookupResponse.getCreationTTL() != 0L ? lookupResponse.getCreationTTL() : lookupResponse.getTTL();
+        return LocalDateTime.now().plusSeconds(creationTtlInSec - tokenInitializationTime);
     }
 
     private String requestAWSIamToken(AbstractConfig config) {
