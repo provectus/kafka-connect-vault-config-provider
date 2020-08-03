@@ -35,12 +35,12 @@ public class VaultConfigProvider implements ConfigProvider {
         String AWS_VAULT_SERVER_ID = "awsserverid";
         String AWS_IAM_ROLE = "awsiamrole";
         String TOKEN_MIN_TTL = "tokenminttl";
-        String TOKEN_INITIALIZATION_TIME = "tokeninitializationtime";
+        String TOKEN_HARD_RENEW_THRESHOLD = "tokenrenewthreshold";
     }
 
     private Vault vault;
     private int minTTL = 3600;
-    private long tokenInitializationTime = 5L;
+    private long hardRenewThreshold = 5L;
     private AbstractConfig config;
 
     public static final ConfigDef CONFIG_DEF = new ConfigDef()
@@ -60,8 +60,8 @@ public class VaultConfigProvider implements ConfigProvider {
                     "Field config for aws vault server id")
             .define(ConfigName.TOKEN_MIN_TTL, ConfigDef.Type.INT, 3600, ConfigDef.Importance.HIGH,
                     "Field config for vault min ttl before renew")
-            .define(ConfigName.TOKEN_INITIALIZATION_TIME, ConfigDef.Type.INT, 5, ConfigDef.Importance.HIGH,
-                    "Time to get and initialize token in seconds");
+            .define(ConfigName.TOKEN_HARD_RENEW_THRESHOLD, ConfigDef.Type.INT, 5, ConfigDef.Importance.HIGH,
+                    "Field config for vault token hard renew threshold in seconds");
 
 
 
@@ -153,7 +153,7 @@ public class VaultConfigProvider implements ConfigProvider {
         this.config = new AbstractConfig(CONFIG_DEF, props);
 
         this.minTTL = config.getInt(ConfigName.TOKEN_MIN_TTL);
-        this.tokenInitializationTime = config.getInt(ConfigName.TOKEN_INITIALIZATION_TIME);
+        this.hardRenewThreshold = config.getInt(ConfigName.TOKEN_HARD_RENEW_THRESHOLD);
         this.vault = buildVault(config);
         this.validateToken();
     }
@@ -184,7 +184,7 @@ public class VaultConfigProvider implements ConfigProvider {
     private LocalDateTime getTokenExpirationTime() throws VaultException {
         LookupResponse lookupResponse = this.vault.auth().lookupSelf();
         long creationTtlInSec = lookupResponse.getCreationTTL() != 0L ? lookupResponse.getCreationTTL() : lookupResponse.getTTL();
-        return LocalDateTime.now().plusSeconds(creationTtlInSec - tokenInitializationTime);
+        return LocalDateTime.now().plusSeconds(creationTtlInSec - hardRenewThreshold);
     }
 
     private String requestAWSIamToken(AbstractConfig config) {
