@@ -104,7 +104,7 @@ public class VaultConfigProvider implements ConfigProvider {
         LOGGER.info("Vault token ttl: {} ", lookupResponse.getTTL());
         if (lookupResponse.getTTL() < this.minTTL) {
             AuthResponse authResponse = vault.auth().renewSelf();
-            LocalDateTime tokenExpirationTime = getTokenExpirationTime();
+            LocalDateTime tokenExpirationTime = getTokenExpirationTime(vault);
             tokenMetadata.updateAndGet(old -> new TokenMetadata(tokenExpirationTime, authResponse.getAuthClientToken()));
         }
     }
@@ -165,7 +165,6 @@ public class VaultConfigProvider implements ConfigProvider {
             String token = config.getString(ConfigName.TOKEN_FIELD);
             if (token.equals("AWS_IAM")) {
                 token = requestAWSIamToken(config);
-                tokenMetadata.set(new TokenMetadata(getTokenExpirationTime(), token));
             }
 
             final VaultConfig vaultConfig = new VaultConfig()
@@ -175,14 +174,16 @@ public class VaultConfigProvider implements ConfigProvider {
                     .readTimeout(config.getInt(ConfigName.READ_TIMEOUT_FIELD))
                     .build();
 
-            return new Vault(vaultConfig);
+            Vault vault = new Vault(vaultConfig);
+            tokenMetadata.set(new TokenMetadata(getTokenExpirationTime(vault), token));
+            return vault;
         } catch (VaultException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private LocalDateTime getTokenExpirationTime() throws VaultException {
-        LookupResponse lookupResponse = this.vault.auth().lookupSelf();
+    private LocalDateTime getTokenExpirationTime(Vault vault) throws VaultException {
+        LookupResponse lookupResponse = vault.auth().lookupSelf();
         long creationTtlInSec = lookupResponse.getCreationTTL() != 0L ? lookupResponse.getCreationTTL() : lookupResponse.getTTL();
         return LocalDateTime.now().plusSeconds(creationTtlInSec - hardRenewThreshold);
     }
