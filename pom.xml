@@ -47,7 +47,7 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-core</artifactId>
-            <version>1.11.585</version>
+            <version>1.12.109</version>
         </dependency>
 
         <dependency>
