@@ -1,11 +1,13 @@
 package com.provectus.kafka.connect.config;
 
+import com.bettercloud.vault.SslConfig;
 import com.bettercloud.vault.Vault;
 import com.bettercloud.vault.VaultConfig;
 import com.bettercloud.vault.VaultException;
 import com.bettercloud.vault.response.AuthResponse;
 import com.bettercloud.vault.response.LookupResponse;
 import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigData;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.provider.ConfigProvider;
@@ -36,6 +38,7 @@ public class VaultConfigProvider implements ConfigProvider {
         String AWS_IAM_ROLE = "awsiamrole";
         String TOKEN_MIN_TTL = "tokenminttl";
         String TOKEN_HARD_RENEW_THRESHOLD = "tokenrenewthreshold";
+        String VAULT_SSL_VERIFY = "sslverify";
     }
 
     private Vault vault;
@@ -61,7 +64,9 @@ public class VaultConfigProvider implements ConfigProvider {
             .define(ConfigName.TOKEN_MIN_TTL, ConfigDef.Type.INT, 3600, ConfigDef.Importance.HIGH,
                     "Field config for vault min ttl before renew")
             .define(ConfigName.TOKEN_HARD_RENEW_THRESHOLD, ConfigDef.Type.INT, 5, ConfigDef.Importance.HIGH,
-                    "Field config for vault token hard renew threshold in seconds");
+                    "Field config for vault token hard renew threshold in seconds")
+            .define(ConfigName.VAULT_SSL_VERIFY, ConfigDef.Type.BOOLEAN, true, ConfigDef.Importance.MEDIUM,
+                    "Field config for vault server SSL verification.");
 
 
 
@@ -169,6 +174,7 @@ public class VaultConfigProvider implements ConfigProvider {
 
             final VaultConfig vaultConfig = new VaultConfig()
                     .address(config.getString(ConfigName.URI_FIELD))
+                    .sslConfig(new SslConfig().verify(config.getBoolean(ConfigName.VAULT_SSL_VERIFY)))
                     .token(token)
                     .openTimeout(config.getInt(ConfigName.OPEN_TIMEOUT_FIELD))
                     .readTimeout(config.getInt(ConfigName.READ_TIMEOUT_FIELD))
@@ -191,7 +197,8 @@ public class VaultConfigProvider implements ConfigProvider {
     private String requestAWSIamToken(AbstractConfig config) {
         return new AwsIamAuth(
             config.getString(ConfigName.AWS_VAULT_SERVER_ID),
-                config.getString(ConfigName.URI_FIELD)
+                config.getString(ConfigName.URI_FIELD),
+                config.getBoolean(ConfigName.VAULT_SSL_VERIFY)
         ).getToken(config.getString(ConfigName.AWS_IAM_ROLE));
     }
 
