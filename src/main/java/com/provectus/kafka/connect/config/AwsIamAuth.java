@@ -5,6 +5,7 @@ import com.amazonaws.auth.AWS4Signer;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.http.HttpMethodName;
+import com.bettercloud.vault.SslConfig;
 import com.bettercloud.vault.Vault;
 import com.bettercloud.vault.VaultConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,8 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.*;
 import java.util.*;
 
 public class AwsIamAuth {
@@ -30,11 +30,13 @@ public class AwsIamAuth {
     private final AWSCredentialsProvider provider;
     private final String serverId;
     private final String vaultAddress;
+    private final boolean sslVerify;
 
-    public AwsIamAuth(String serverId, String vaultAddress) {
+    public AwsIamAuth(String serverId, String vaultAddress, boolean sslVerify) {
         this.provider = DefaultAWSCredentialsProviderChain.getInstance();
         this.serverId = serverId;
         this.vaultAddress = vaultAddress;
+        this.sslVerify = sslVerify;
     }
 
     private Map<String,String> getHeaders() throws URISyntaxException, UnsupportedEncodingException {
@@ -56,6 +58,28 @@ public class AwsIamAuth {
         return defaultRequest.getHeaders();
     }
 
+    private void logMyIp() {
+        String ip;
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                // filters out 127.0.0.1 and inactive interfaces
+                if (iface.isLoopback() || !iface.isUp())
+                    continue;
+
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while(addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    ip = addr.getHostAddress();
+                    System.out.println(iface.getDisplayName() + " " + String.join("-", ip.split("\\.")));
+                }
+            }
+        } catch (SocketException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public String getToken(String role) {
         try {
 
@@ -68,9 +92,23 @@ public class AwsIamAuth {
 
             VaultConfig vaultConfig = new VaultConfig()
                     .address(vaultAddress)
+                    .sslConfig(new SslConfig().verify(this.sslVerify))
                     .build();
 
             Vault vault = new Vault(vaultConfig);
+
+            try {
+
+                InetAddress inetHost = InetAddress.getByName("prod.vault.reainternal.net");
+                String hostName = inetHost.getHostName();
+                System.out.println("The host name was: " + hostName);
+                System.out.println("The hosts IP address is: " + String.join("-", inetHost.getHostAddress().split("\\.")));
+
+            } catch(UnknownHostException ex) {
+                System.out.println("Unrecognized host");
+            }
+
+            logMyIp();
 
             return vault.auth().loginByAwsIam(
                     role,

@@ -6,6 +6,7 @@ import com.bettercloud.vault.VaultException;
 import com.bettercloud.vault.response.AuthResponse;
 import com.bettercloud.vault.response.LookupResponse;
 import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigData;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.provider.ConfigProvider;
@@ -37,6 +38,7 @@ public class VaultConfigProvider implements ConfigProvider {
         String AWS_IAM_ROLE = "awsiamrole";
         String TOKEN_MIN_TTL = "tokenminttl";
         String TOKEN_HARD_RENEW_THRESHOLD = "tokenrenewthreshold";
+        String VAULT_SSL_VERIFY = "sslverify";
     }
 
     private Vault vault;
@@ -64,7 +66,9 @@ public class VaultConfigProvider implements ConfigProvider {
             .define(ConfigName.TOKEN_HARD_RENEW_THRESHOLD, ConfigDef.Type.INT, 5, ConfigDef.Importance.HIGH,
                     "Field config for vault token hard renew threshold in seconds")
             .define(ConfigName.ENGINE_VERSION_FIELD, ConfigDef.Type.INT, 2, ConfigDef.Importance.MEDIUM,
-                    "Field config for vault KV engine version");
+                    "Field config for vault KV engine version")
+            .define(ConfigName.VAULT_SSL_VERIFY, ConfigDef.Type.BOOLEAN, true, ConfigDef.Importance.MEDIUM,
+                    "Field config for vault server SSL verification.");
 
 
 
@@ -195,7 +199,8 @@ public class VaultConfigProvider implements ConfigProvider {
     private String requestAWSIamToken(AbstractConfig config) {
         return new AwsIamAuth(
             config.getString(ConfigName.AWS_VAULT_SERVER_ID),
-                config.getString(ConfigName.URI_FIELD)
+                config.getString(ConfigName.URI_FIELD),
+                config.getBoolean(ConfigName.VAULT_SSL_VERIFY)
         ).getToken(config.getString(ConfigName.AWS_IAM_ROLE));
     }
 
