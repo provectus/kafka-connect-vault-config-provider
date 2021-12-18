@@ -42,7 +42,11 @@ public class AwsIamAuth {
     private Map<String,String> getHeaders() throws URISyntaxException, UnsupportedEncodingException {
 
         Map<String,String> headers = new LinkedHashMap<>();
-        headers.put("X-Vault-AWS-IAM-Server-ID", serverId);
+
+        if (serverId != null && serverId != "") {
+            headers.put("X-Vault-AWS-IAM-Server-ID", serverId);
+        }
+
         headers.put(HttpHeaders.CONTENT_TYPE, "application/x-www-form-urlencoded; charset=utf-8");
 
         DefaultRequest<String> defaultRequest = new DefaultRequest<>("sts");
