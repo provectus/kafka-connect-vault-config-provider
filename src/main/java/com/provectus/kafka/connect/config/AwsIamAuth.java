@@ -62,28 +62,6 @@ public class AwsIamAuth {
         return defaultRequest.getHeaders();
     }
 
-    private void logMyIp() {
-        String ip;
-        try {
-            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                NetworkInterface iface = interfaces.nextElement();
-                // filters out 127.0.0.1 and inactive interfaces
-                if (iface.isLoopback() || !iface.isUp())
-                    continue;
-
-                Enumeration<InetAddress> addresses = iface.getInetAddresses();
-                while(addresses.hasMoreElements()) {
-                    InetAddress addr = addresses.nextElement();
-                    ip = addr.getHostAddress();
-                    System.out.println(iface.getDisplayName() + " " + String.join("-", ip.split("\\.")));
-                }
-            }
-        } catch (SocketException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public String getToken(String role) {
         try {
 
@@ -100,19 +78,6 @@ public class AwsIamAuth {
                     .build();
 
             Vault vault = new Vault(vaultConfig);
-
-            try {
-
-                InetAddress inetHost = InetAddress.getByName("prod.vault.reainternal.net");
-                String hostName = inetHost.getHostName();
-                System.out.println("The host name was: " + hostName);
-                System.out.println("The hosts IP address is: " + String.join("-", inetHost.getHostAddress().split("\\.")));
-
-            } catch(UnknownHostException ex) {
-                System.out.println("Unrecognized host");
-            }
-
-            logMyIp();
 
             return vault.auth().loginByAwsIam(
                     role,
