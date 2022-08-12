@@ -32,6 +32,7 @@ public class VaultConfigProvider implements ConfigProvider {
         String OPEN_TIMEOUT_FIELD = "opentimeout";
         String READ_TIMEOUT_FIELD = "readtimeout";
         String MAX_RETRIES_FIELD = "maxretries";
+        String ENGINE_VERSION_FIELD = "engineversion";
         String AWS_VAULT_SERVER_ID = "awsserverid";
         String AWS_IAM_ROLE = "awsiamrole";
         String TOKEN_MIN_TTL = "tokenminttl";
@@ -61,7 +62,9 @@ public class VaultConfigProvider implements ConfigProvider {
             .define(ConfigName.TOKEN_MIN_TTL, ConfigDef.Type.INT, 3600, ConfigDef.Importance.HIGH,
                     "Field config for vault min ttl before renew")
             .define(ConfigName.TOKEN_HARD_RENEW_THRESHOLD, ConfigDef.Type.INT, 5, ConfigDef.Importance.HIGH,
-                    "Field config for vault token hard renew threshold in seconds");
+                    "Field config for vault token hard renew threshold in seconds")
+            .define(ConfigName.ENGINE_VERSION_FIELD, ConfigDef.Type.INT, 2, ConfigDef.Importance.MEDIUM,
+                    "Field config for vault KV engine version");
 
 
 
@@ -172,6 +175,7 @@ public class VaultConfigProvider implements ConfigProvider {
                     .token(token)
                     .openTimeout(config.getInt(ConfigName.OPEN_TIMEOUT_FIELD))
                     .readTimeout(config.getInt(ConfigName.READ_TIMEOUT_FIELD))
+                    .engineVersion(config.getInt(ConfigName.ENGINE_VERSION_FIELD))
                     .build();
 
             Vault vault = new Vault(vaultConfig);
