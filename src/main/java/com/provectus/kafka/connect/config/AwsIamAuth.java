@@ -2,6 +2,7 @@ package com.provectus.kafka.connect.config;
 
 import com.amazonaws.DefaultRequest;
 import com.amazonaws.auth.AWS4Signer;
+import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.http.HttpMethodName;
@@ -56,16 +57,24 @@ public class AwsIamAuth {
         defaultRequest.setHeaders(headers);
         defaultRequest.setHttpMethod(HttpMethodName.POST);
         defaultRequest.setEndpoint(new URI(DEFAULT_AWS_STS_ENDPOINT));
+        LOGGER.info("DEFAULT REQUEST IS {}", defaultRequest);
+
+        LOGGER.info("CRED PROVIDER is {}", provider.getClass().toString());
+
+        AWSCredentials credentials = provider.getCredentials();
+        LOGGER.info("CREDENTIALS ARE {}", credentials.getClass().toString());
 
         AWS4Signer aws4Signer = new AWS4Signer();
         aws4Signer.setServiceName(defaultRequest.getServiceName());
-        aws4Signer.sign(defaultRequest, provider.getCredentials());
+        aws4Signer.sign(defaultRequest, credentials);
 
         return defaultRequest.getHeaders();
     }
 
     public String getToken(String role) {
         try {
+
+            LOGGER.info("GET TOKEN FOR ROLE {}", role);
 
             Map<String, List<String>> signedHeaders = new HashMap<>();
             for (Map.Entry<String, String> entry : getHeaders().entrySet()) {

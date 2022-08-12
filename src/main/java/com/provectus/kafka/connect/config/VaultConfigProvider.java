@@ -6,6 +6,7 @@ import com.bettercloud.vault.VaultConfig;
 import com.bettercloud.vault.VaultException;
 import com.bettercloud.vault.response.AuthResponse;
 import com.bettercloud.vault.response.LookupResponse;
+import jdk.vm.ci.meta.Local;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigData;
@@ -16,11 +17,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 public class VaultConfigProvider implements ConfigProvider {
 
@@ -91,8 +90,10 @@ public class VaultConfigProvider implements ConfigProvider {
     private void validateToken() {
         try {
             if (isNeedHardRenew()) {
+                LOGGER.info("Needs hard renew");
                 buildVault();
             } else {
+                LOGGER.info("Renew Token");
                 renewToken();
             }
         } catch (Exception e) {
@@ -110,8 +111,21 @@ public class VaultConfigProvider implements ConfigProvider {
     private void renewToken() throws VaultException {
         LookupResponse lookupResponse = vault.auth().lookupSelf();
         LOGGER.info("Vault token ttl: {} ", lookupResponse.getTTL());
+        LOGGER.info("Vault token accessor: {}", Objects.toString(lookupResponse.getAccessor(), ""));
+        LOGGER.info("Vault token id: {}", Objects.toString(lookupResponse.getId(), ""));
+        LOGGER.info("Vault token accessor: {}", Objects.toString(lookupResponse.getAccessor(), ""));
+        LOGGER.info("Vault token username: {}", Objects.toString(lookupResponse.getUsername(), ""));
+        LOGGER.info("Vault token path: {}", Objects.toString(lookupResponse.getPath(), ""));
+        LOGGER.info("Vault token policies: {}", Objects.toString(lookupResponse.getPolicies().stream().collect(Collectors.joining(",")), ""));
         if (lookupResponse.getTTL() < this.minTTL) {
             AuthResponse authResponse = vault.auth().renewSelf();
+
+            LOGGER.info("Vault auth client token: {}", Objects.toString(authResponse.getAuthClientToken(), ""));
+            LOGGER.info("Vault auth appId: {}", Objects.toString(authResponse.getAppId(), ""));
+            LOGGER.info("Vault auth username: {}", Objects.toString(authResponse.getUsername(), ""));
+            LOGGER.info("Vault auth token accessor: {}", Objects.toString(authResponse.getTokenAccessor(), ""));
+            LOGGER.info("Vault auth user id: {}", Objects.toString(authResponse.getUserId(), ""));
+
             LocalDateTime tokenExpirationTime = getTokenExpirationTime(vault);
             tokenMetadata.updateAndGet(old -> new TokenMetadata(tokenExpirationTime, authResponse.getAuthClientToken()));
         }
@@ -126,6 +140,14 @@ public class VaultConfigProvider implements ConfigProvider {
             throw new RuntimeException("Vault is not configured");
         }
         validateToken();
+        if (path == null) {
+            LOGGER.info("Path is null");
+        }
+
+        if (path.isEmpty()) {
+            LOGGER.info("Path is empty");
+        }
+
         return path == null || path.isEmpty();
     }
 
@@ -188,6 +210,12 @@ public class VaultConfigProvider implements ConfigProvider {
             String token = config.getString(ConfigName.TOKEN_FIELD);
             if (token.equals("AWS_IAM")) {
                 token = requestAWSIamToken(config);
+                if (token == null) {
+                    LOGGER.info("GOT A NULL TOKEN");
+                } else {
+                    LOGGER.info("TOKEN is {}", token);
+                    LOGGER.info("TOKEN base64 is {}", Base64.getEncoder().encodeToString(token.getBytes()));
+                }
             }
 
             final VaultConfig vaultConfig = new VaultConfig()
@@ -200,7 +228,9 @@ public class VaultConfigProvider implements ConfigProvider {
                     .build();
 
             Vault vault = new Vault(vaultConfig);
-            tokenMetadata.set(new TokenMetadata(getTokenExpirationTime(vault), token));
+            LocalDateTime tokenExpirationTime = getTokenExpirationTime(vault);
+            LOGGER.info("Token expiration time is {}", tokenExpirationTime);
+            tokenMetadata.set(new TokenMetadata(tokenExpirationTime, token));
             return vault;
         } catch (VaultException e) {
             throw new RuntimeException(e);
