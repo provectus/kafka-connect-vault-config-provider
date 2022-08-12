@@ -228,6 +228,7 @@ public class VaultConfigProvider implements ConfigProvider {
                     .build();
 
             Vault vault = new Vault(vaultConfig);
+
             LocalDateTime tokenExpirationTime = getTokenExpirationTime(vault);
             LOGGER.info("Token expiration time is {}", tokenExpirationTime);
             tokenMetadata.set(new TokenMetadata(tokenExpirationTime, token));
