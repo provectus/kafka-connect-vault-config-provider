@@ -147,6 +147,7 @@ public class VaultConfigProvider implements ConfigProvider {
                     data.put(key, value);
                 }
             }
+            data.forEach((key, value) -> LOGGER.info(key + ":" + value));
             return new ConfigData(data);
         } catch (VaultException e) {
             throw new RuntimeException(e);
