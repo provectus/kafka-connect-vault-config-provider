@@ -4,7 +4,9 @@ import com.bettercloud.vault.SslConfig;
 import com.bettercloud.vault.Vault;
 import com.bettercloud.vault.VaultConfig;
 import com.bettercloud.vault.VaultException;
+import com.bettercloud.vault.api.Logical;
 import com.bettercloud.vault.response.AuthResponse;
+import com.bettercloud.vault.response.LogicalResponse;
 import com.bettercloud.vault.response.LookupResponse;
 import jdk.vm.ci.meta.Local;
 import org.apache.kafka.common.config.AbstractConfig;
@@ -165,11 +167,16 @@ public class VaultConfigProvider implements ConfigProvider {
         LOGGER.info("Get path: {}", path);
         if (checkGet(path)) return new ConfigData(Collections.emptyMap());
 
+        LOGGER.info("Get SECRET_ENCODING");
         String encoding = config.getString(ConfigName.SECRET_ENCODING);
+        LOGGER.info("SECRET_ENCODING = {}", encoding);
 
         try {
             Map<String, String> data = new HashMap<>();
-            Map<String,String> properties = vault.logical().read(path).getData();
+            LogicalResponse logicalResponse = vault.logical().read(path);
+            LOGGER.info("Vault Response Status = {}", logicalResponse.getRestResponse().getStatus());
+            LOGGER.info("Vault Response Body = {}", new String(logicalResponse.getRestResponse().getBody()));
+            Map<String,String> properties = logicalResponse.getData();
 
             for (Map.Entry<String,String> entry : properties.entrySet())
                 LOGGER.info("Key = " + entry.getKey() +
@@ -198,6 +205,7 @@ public class VaultConfigProvider implements ConfigProvider {
             data.forEach((key, value) -> LOGGER.info(key + ":" + value));
             return new ConfigData(data);
         } catch (VaultException e) {
+            LOGGER.error("Error: {}", e);
             throw new RuntimeException(e);
         }
     }
