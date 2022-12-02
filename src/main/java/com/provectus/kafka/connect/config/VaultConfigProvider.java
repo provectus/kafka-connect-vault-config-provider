@@ -214,7 +214,7 @@ public class VaultConfigProvider implements ConfigProvider {
             LOGGER.info("Key={}, Value={}", key, value);
             LOGGER.info("Value length is {}", value != null ? value.length() : 0);
 
-            if (encoding != null && encoding.equals("BASE64")) {
+            if (encoding != null && value != null && encoding.equals("BASE64")) {
                 value = new String(Base64.getDecoder().decode(value));
                 LOGGER.info("Key={}, Decoded Value={}", key, value);
             }
