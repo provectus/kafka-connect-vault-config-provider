@@ -7,7 +7,7 @@
     <groupId>com.provectus</groupId>
     <artifactId>kafka-connect-vault-config-provider</artifactId>
     <name>kafka-connect-vault-config-provider</name>
-    <version>0.8.12-logging</version>
+    <version>0.8.13-logging</version>
     <packaging>jar</packaging>
 
     <properties>
