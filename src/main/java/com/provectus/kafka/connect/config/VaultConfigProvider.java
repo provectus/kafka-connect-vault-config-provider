@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -159,7 +160,7 @@ public class VaultConfigProvider implements ConfigProvider {
 
     private final Cache<String, Map<String,String>> cache = CacheBuilder.newBuilder()
             .maximumSize(100)
-            .expireAfterWrite(Duration.ofHours(4))
+            .expireAfterWrite(4, TimeUnit.HOURS)
             .build();
 
     /**
