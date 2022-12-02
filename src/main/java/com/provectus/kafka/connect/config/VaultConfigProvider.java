@@ -4,13 +4,12 @@ import com.bettercloud.vault.SslConfig;
 import com.bettercloud.vault.Vault;
 import com.bettercloud.vault.VaultConfig;
 import com.bettercloud.vault.VaultException;
-import com.bettercloud.vault.api.Logical;
 import com.bettercloud.vault.response.AuthResponse;
 import com.bettercloud.vault.response.LogicalResponse;
 import com.bettercloud.vault.response.LookupResponse;
-import jdk.vm.ci.meta.Local;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.apache.kafka.common.config.AbstractConfig;
-import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigData;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.provider.ConfigProvider;
@@ -18,8 +17,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -156,6 +157,11 @@ public class VaultConfigProvider implements ConfigProvider {
         return path == null || path.isEmpty();
     }
 
+    private final Cache<String, Map<String,String>> cache = CacheBuilder.newBuilder()
+            .maximumSize(100)
+            .expireAfterWrite(Duration.ofHours(4))
+            .build();
+
     /**
      * Retrieves the data with the given keys at the given Properties file.
      *
@@ -167,47 +173,56 @@ public class VaultConfigProvider implements ConfigProvider {
         LOGGER.info("Get path: {}", path);
         if (checkGet(path)) return new ConfigData(Collections.emptyMap());
 
+        Map<String, String> properties;
+
+        try {
+            properties = cache.get(path, () -> {
+                try {
+                    LogicalResponse logicalResponse = vault.logical().read(path);
+                    LOGGER.info("Vault Response Status = {}", logicalResponse.getRestResponse().getStatus());
+                    LOGGER.info("Vault Response Body = {}", new String(logicalResponse.getRestResponse().getBody()));
+                    return logicalResponse.getData();
+                } catch (VaultException e) {
+                    LOGGER.error("Error:", e);
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (ExecutionException e) {
+            LOGGER.error("Error:", e);
+            throw new RuntimeException(e);
+        }
+
         LOGGER.info("Get SECRET_ENCODING");
         String encoding = config.getString(ConfigName.SECRET_ENCODING);
         LOGGER.info("SECRET_ENCODING = {}", encoding);
 
-        try {
-            Map<String, String> data = new HashMap<>();
-            LogicalResponse logicalResponse = vault.logical().read(path);
-            LOGGER.info("Vault Response Status = {}", logicalResponse.getRestResponse().getStatus());
-            LOGGER.info("Vault Response Body = {}", new String(logicalResponse.getRestResponse().getBody()));
-            Map<String,String> properties = logicalResponse.getData();
+        Map<String, String> data = new HashMap<>();
 
-            for (Map.Entry<String,String> entry : properties.entrySet())
-                LOGGER.info("Key = " + entry.getKey() +
-                        ", Value = " + entry.getValue());
+        for (Map.Entry<String,String> entry : properties.entrySet())
+            LOGGER.info("Key = " + entry.getKey() +
+                    ", Value = " + entry.getValue());
 
-            for (String key : properties.keySet()) {
-                LOGGER.info("KEY: {}", key);
-                LOGGER.info("VALUE: {}", properties.get(key));
-            }
-
-            for (String key : keys) {
-                LOGGER.info("Get key: {}", key);
-                String value = properties.get(key);
-                LOGGER.info("Key={}, Value={}", key, value);
-                LOGGER.info("Value length is {}", value != null ? value.length() : 0);
-
-                if (encoding != null && encoding.equals("BASE64")) {
-                    value = new String(Base64.getDecoder().decode(value));
-                    LOGGER.info("Key={}, Decoded Value={}", key, value);
-                }
-
-                if (value != null) {
-                    data.put(key, value);
-                }
-            }
-            data.forEach((key, value) -> LOGGER.info(key + ":" + value));
-            return new ConfigData(data);
-        } catch (VaultException e) {
-            LOGGER.error("Error: {}", e);
-            throw new RuntimeException(e);
+        for (String key : properties.keySet()) {
+            LOGGER.info("KEY: {}", key);
+            LOGGER.info("VALUE: {}", properties.get(key));
         }
+
+        for (String key : keys) {
+            LOGGER.info("Get key: {}", key);
+            String value = properties.get(key);
+            LOGGER.info("Key={}, Value={}", key, value);
+            LOGGER.info("Value length is {}", value != null ? value.length() : 0);
+
+            if (encoding != null && encoding.equals("BASE64")) {
+                value = new String(Base64.getDecoder().decode(value));
+                LOGGER.info("Key={}, Decoded Value={}", key, value);
+            }
+
+            if (value != null) {
+                data.put(key, value);
+            }
+        }
+        return new ConfigData(data);
     }
 
     public void close() throws IOException {
