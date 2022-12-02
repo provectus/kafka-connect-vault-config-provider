@@ -158,7 +158,7 @@ public class VaultConfigProvider implements ConfigProvider {
         return path == null || path.isEmpty();
     }
 
-    private final Cache<String, Map<String,String>> cache = CacheBuilder.newBuilder()
+    private static final Cache<String, Map<String,String>> cache = CacheBuilder.newBuilder()
             .maximumSize(100)
             .expireAfterWrite(4, TimeUnit.HOURS)
             .build();
