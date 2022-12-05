@@ -31,12 +31,14 @@ public class AwsIamAuth {
     private final String serverId;
     private final String vaultAddress;
     private final boolean sslVerify;
+    private final int engineVersion;
 
-    public AwsIamAuth(String serverId, String vaultAddress, boolean sslVerify) {
+    public AwsIamAuth(String serverId, String vaultAddress, boolean sslVerify, int engineVersion) {
         this.provider = DefaultAWSCredentialsProviderChain.getInstance();
         this.serverId = serverId;
         this.vaultAddress = vaultAddress;
         this.sslVerify = sslVerify;
+        this.engineVersion = engineVersion;
     }
 
     private Map<String,String> getHeaders() throws URISyntaxException, UnsupportedEncodingException {
@@ -75,6 +77,7 @@ public class AwsIamAuth {
             VaultConfig vaultConfig = new VaultConfig()
                     .address(vaultAddress)
                     .sslConfig(new SslConfig().verify(this.sslVerify))
+                    .engineVersion(engineVersion)
                     .build();
 
             Vault vault = new Vault(vaultConfig);

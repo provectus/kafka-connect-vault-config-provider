@@ -203,7 +203,8 @@ public class VaultConfigProvider implements ConfigProvider {
         return new AwsIamAuth(
             config.getString(ConfigName.AWS_VAULT_SERVER_ID),
                 config.getString(ConfigName.URI_FIELD),
-                config.getBoolean(ConfigName.VAULT_SSL_VERIFY)
+                config.getBoolean(ConfigName.VAULT_SSL_VERIFY),
+                config.getInt(ConfigName.ENGINE_VERSION_FIELD)
         ).getToken(config.getString(ConfigName.AWS_IAM_ROLE));
     }
 
